@@ -5,19 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resume Voice Agent</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f9; }
-        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px; background-color: #007bff; color: white; margin-top: 1rem; }
-        button:disabled { background-color: #ccc; }
-        #status { margin-top: 1rem; color: #555; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f9; margin: 0; }
+        .container { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); text-align: center; max-width: 400px; width: 90%; }
+        h1 { margin-top: 0; color: #1a202c; font-size: 1.5rem; }
+        p { color: #4a5568; margin-bottom: 1.5rem; }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            background-color: #007bff;
+            color: white;
+            transition: all 0.2s ease;
+            outline: none;
+            box-shadow: 0 4px 6px rgba(0, 123, 255, 0.2);
+            position: relative;
+        }
+
+        button:hover:not(:disabled) { background-color: #0069d9; transform: translateY(-1px); }
+        button:active:not(:disabled) { transform: translateY(0); }
+        button:focus-visible { outline: 3px solid rgba(0, 123, 255, 0.5); outline-offset: 2px; }
+        button:disabled { background-color: #cbd5e0; cursor: not-allowed; box-shadow: none; }
+
+        .recording { background-color: #dc3545 !important; animation: pulse 1.5s infinite; box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+
+        #status { margin-top: 1.5rem; color: #718096; font-size: 0.9rem; font-weight: 500; min-height: 1.2em; }
+        .error-status { color: #e53e3e !important; }
+
+        audio { margin-top: 1.5rem; width: 100%; border-radius: 8px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Resume Voice Agent</h1>
-        <p>Click and hold to speak, release to send.</p>
-        <button id="recordBtn">Push to Talk</button>
-        <div id="status">Ready</div>
+        <p>Press and hold to speak, release to send.</p>
+        <button id="recordBtn" aria-label="Push to talk" aria-pressed="false">
+            Push to Talk
+        </button>
+        <div id="status" aria-live="polite">Ready</div>
         <audio id="audioPlayer" controls style="display:none;"></audio>
     </div>
 
@@ -28,13 +62,22 @@
         let mediaRecorder;
         let audioChunks = [];
         let socket;
+        let isRecording = false;
 
         // Initialize WebSocket
         function initWebSocket() {
-            socket = new WebSocket('ws://localhost:8000/voice');
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host || 'localhost:8000';
+            const wsUrl = `${protocol}//${host}/voice`;
+
+            socket = new WebSocket(wsUrl);
             socket.binaryType = 'arraybuffer';
 
-            socket.onopen = () => status.innerText = 'Connected to server';
+            socket.onopen = () => {
+                status.innerText = 'Connected to server';
+                status.classList.remove('error-status');
+            };
+
             socket.onclose = () => {
                 status.innerText = 'Disconnected. Retrying...';
                 setTimeout(initWebSocket, 2000);
@@ -45,36 +88,93 @@
                 const url = URL.createObjectURL(blob);
                 audioPlayer.src = url;
                 audioPlayer.style.display = 'block';
-                audioPlayer.play();
+                audioPlayer.play().catch(e => console.error("Auto-play failed:", e));
                 status.innerText = 'Playing response...';
+            };
+
+            socket.onerror = () => {
+                status.innerText = 'WebSocket Error';
+                status.classList.add('error-status');
             };
         }
 
         initWebSocket();
 
-        // Recording logic
-        recordBtn.onmousedown = async () => {
-            audioChunks = [];
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
+        async function startRecording() {
+            if (isRecording) return;
 
-            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                audioBlob.arrayBuffer().then(buffer => {
-                    socket.send(buffer);
-                    status.innerText = 'Sent audio, waiting for response...';
-                });
-            };
+            try {
+                audioChunks = [];
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
 
-            mediaRecorder.start();
-            status.innerText = 'Recording...';
-            recordBtn.style.backgroundColor = '#dc3545';
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    audioBlob.arrayBuffer().then(buffer => {
+                        if (socket && socket.readyState === WebSocket.OPEN) {
+                            socket.send(buffer);
+                            status.innerText = 'Sent audio, waiting for response...';
+                        } else {
+                            status.innerText = 'Error: Not connected to server';
+                            status.classList.add('error-status');
+                        }
+                    });
+
+                    // Stop all tracks to release microphone
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                status.innerText = 'Recording...';
+                status.classList.remove('error-status');
+                recordBtn.classList.add('recording');
+                recordBtn.setAttribute('aria-pressed', 'true');
+            } catch (err) {
+                console.error('Microphone access denied:', err);
+                status.innerText = 'Error: Microphone access denied';
+                status.classList.add('error-status');
+            }
+        }
+
+        function stopRecording() {
+            if (!isRecording) return;
+
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+            recordBtn.classList.remove('recording');
+            recordBtn.setAttribute('aria-pressed', 'false');
+        }
+
+        // Mouse events
+        recordBtn.onmousedown = (e) => {
+            if (e.button === 0) startRecording();
         };
+        recordBtn.onmouseup = stopRecording;
+        recordBtn.onmouseleave = stopRecording;
 
-        recordBtn.onmouseup = () => {
-            mediaRecorder.stop();
-            recordBtn.style.backgroundColor = '#007bff';
+        // Touch events
+        recordBtn.ontouchstart = (e) => {
+            e.preventDefault();
+            startRecording();
+        };
+        recordBtn.ontouchend = stopRecording;
+
+        // Keyboard events
+        recordBtn.onkeydown = (e) => {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                startRecording();
+            }
+        };
+        recordBtn.onkeyup = (e) => {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                stopRecording();
+            }
         };
     </script>
 </body>
