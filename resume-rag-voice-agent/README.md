@@ -120,6 +120,39 @@ Connect to the `/voice` endpoint:
 
 Interruption handling is built-in. If you send new audio while the assistant is processing, the previous task will be cancelled.
 
-## MCP Tools
+## MCP Integration
 
-The system exposes MCP tools via `backend/app/utils/mcp_server.py`. These can be integrated into other AI agents or tools.
+The system exposes MCP tools via a SSE (Server-Sent Events) endpoint at `/mcp`. These tools can be integrated into other AI agents or tools.
+
+### MCP Tools available:
+- `resume_search(query: str)`: Search the resume for relevant information.
+- `conversation_memory(session_id: str)`: Retrieve the conversation history for a specific session.
+
+### Configuration for Claude Desktop:
+To use these tools in Claude Desktop, add the following to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "resume-agent": {
+      "command": "python",
+      "args": ["-m", "backend.main"],
+      "env": {
+        "OPENAI_API_KEY": "your_openai_api_key",
+        "SUPABASE_URL": "your_supabase_url",
+        "SUPABASE_SERVICE_KEY": "your_supabase_service_key"
+      }
+    }
+  }
+}
+```
+
+Or connect via the SSE endpoint if using an MCP-compatible client that supports remote servers:
+- **SSE URL**: `http://localhost:8000/mcp/sse`
+
+## Frontend
+
+A basic push-to-talk frontend is provided in the `frontend/` directory. To use it:
+1. Open `frontend/index.html` in your browser.
+2. Ensure the backend is running (`uvicorn backend.main:app`).
+3. Click and hold the "Push to Talk" button to speak, then release to send the audio to the agent.
