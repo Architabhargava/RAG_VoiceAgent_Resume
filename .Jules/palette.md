@@ -1,0 +1,3 @@
+## 2025-05-15 - [Micro-UX: Accessible & Responsive Voice Interaction]
+**Learning:** For voice-based interactions, users expect immediate feedback and alternative input methods (like keyboard shortcuts). Relying solely on asynchronous calls (like `getUserMedia`) for UI updates can make the app feel sluggish.
+**Action:** Update UI state (ARIA attributes, colors, status text) immediately upon user interaction, before awaiting long-running async operations. Always provide keyboard alternatives (e.g., Space key for PTT) and ensure screen readers are notified of state changes via `aria-live` and `aria-pressed`.

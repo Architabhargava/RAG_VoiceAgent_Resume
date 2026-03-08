@@ -7,8 +7,10 @@
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f9; }
         .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px; background-color: #007bff; color: white; margin-top: 1rem; }
-        button:disabled { background-color: #ccc; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px; background-color: #007bff; color: white; margin-top: 1rem; transition: background-color 0.2s, transform 0.1s; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        button:focus-visible { outline: 3px solid #0056b3; outline-offset: 2px; }
+        button:active { transform: scale(0.98); }
         #status { margin-top: 1rem; color: #555; }
     </style>
 </head>
@@ -16,8 +18,8 @@
     <div class="container">
         <h1>Resume Voice Agent</h1>
         <p>Click and hold to speak, release to send.</p>
-        <button id="recordBtn">Push to Talk</button>
-        <div id="status">Ready</div>
+        <button id="recordBtn" aria-pressed="false" aria-label="Push to talk">Push to Talk</button>
+        <div id="status" aria-live="polite">Ready</div>
         <audio id="audioPlayer" controls style="display:none;"></audio>
     </div>
 
@@ -53,29 +55,62 @@
         initWebSocket();
 
         // Recording logic
-        recordBtn.onmousedown = async () => {
-            audioChunks = [];
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
+        async function startRecording() {
+            if (recordBtn.getAttribute('aria-pressed') === 'true') return;
 
-            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                audioBlob.arrayBuffer().then(buffer => {
-                    socket.send(buffer);
-                    status.innerText = 'Sent audio, waiting for response...';
-                });
-            };
-
-            mediaRecorder.start();
-            status.innerText = 'Recording...';
+            recordBtn.setAttribute('aria-pressed', 'true');
             recordBtn.style.backgroundColor = '#dc3545';
-        };
+            status.innerText = 'Requesting microphone...';
 
-        recordBtn.onmouseup = () => {
-            mediaRecorder.stop();
+            try {
+                audioChunks = [];
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    audioBlob.arrayBuffer().then(buffer => {
+                        socket.send(buffer);
+                        status.innerText = 'Sent audio, waiting for response...';
+                    });
+                };
+
+                mediaRecorder.start();
+                status.innerText = 'Recording...';
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                status.innerText = 'Error: Could not access microphone.';
+                recordBtn.setAttribute('aria-pressed', 'false');
+                recordBtn.style.backgroundColor = '#007bff';
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
             recordBtn.style.backgroundColor = '#007bff';
-        };
+            recordBtn.setAttribute('aria-pressed', 'false');
+        }
+
+        recordBtn.addEventListener('mousedown', startRecording);
+        recordBtn.addEventListener('mouseup', stopRecording);
+
+        // Keyboard support
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && recordBtn.getAttribute('aria-pressed') === 'false') {
+                e.preventDefault();
+                startRecording();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space' && recordBtn.getAttribute('aria-pressed') === 'true') {
+                e.preventDefault();
+                stopRecording();
+            }
+        });
     </script>
 </body>
 </html>
