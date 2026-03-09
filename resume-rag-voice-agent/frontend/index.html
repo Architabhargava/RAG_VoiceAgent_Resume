@@ -7,8 +7,10 @@
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f9; }
         .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px; background-color: #007bff; color: white; margin-top: 1rem; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px; background-color: #007bff; color: white; margin-top: 1rem; transition: background-color 0.2s; }
         button:disabled { background-color: #ccc; }
+        button:focus-visible { outline: 2px solid #0056b3; outline-offset: 2px; }
+        #recordBtn.recording { background-color: #dc3545; }
         #status { margin-top: 1rem; color: #555; }
     </style>
 </head>
@@ -16,8 +18,8 @@
     <div class="container">
         <h1>Resume Voice Agent</h1>
         <p>Click and hold to speak, release to send.</p>
-        <button id="recordBtn">Push to Talk</button>
-        <div id="status">Ready</div>
+        <button id="recordBtn" aria-label="Push to Talk">Push to Talk</button>
+        <div id="status" aria-live="polite">Ready</div>
         <audio id="audioPlayer" controls style="display:none;"></audio>
     </div>
 
@@ -52,30 +54,65 @@
 
         initWebSocket();
 
-        // Recording logic
-        recordBtn.onmousedown = async () => {
+        let isRecording = false;
+
+        async function startRecording() {
+            if (isRecording) return;
+            isRecording = true;
             audioChunks = [];
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
 
-            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                audioBlob.arrayBuffer().then(buffer => {
-                    socket.send(buffer);
-                    status.innerText = 'Sent audio, waiting for response...';
-                });
-            };
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    audioBlob.arrayBuffer().then(buffer => {
+                        socket.send(buffer);
+                        status.innerText = 'Sent audio, waiting for response...';
+                    });
+                };
 
-            mediaRecorder.start();
-            status.innerText = 'Recording...';
-            recordBtn.style.backgroundColor = '#dc3545';
-        };
+                mediaRecorder.start();
+                status.innerText = 'Recording...';
+                recordBtn.classList.add('recording');
+                recordBtn.innerText = 'Recording...';
+            } catch (err) {
+                console.error("Error accessing microphone:", err);
+                status.innerText = 'Error: Microphone access denied.';
+                isRecording = false;
+            }
+        }
 
-        recordBtn.onmouseup = () => {
-            mediaRecorder.stop();
-            recordBtn.style.backgroundColor = '#007bff';
-        };
+        function stopRecording() {
+            if (!isRecording) return;
+            isRecording = false;
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            recordBtn.classList.remove('recording');
+            recordBtn.innerText = 'Push to Talk';
+        }
+
+        // Recording logic using event listeners
+        recordBtn.addEventListener('mousedown', startRecording);
+        recordBtn.addEventListener('mouseup', stopRecording);
+        recordBtn.addEventListener('mouseleave', stopRecording); // Stop if mouse leaves button
+
+        // Keyboard support (Space key)
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && document.activeElement === recordBtn) {
+                e.preventDefault();
+                startRecording();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space' && document.activeElement === recordBtn) {
+                e.preventDefault();
+                stopRecording();
+            }
+        });
     </script>
 </body>
 </html>
