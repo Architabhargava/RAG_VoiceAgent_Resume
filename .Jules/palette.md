@@ -1,0 +1,4 @@
+## 2025-05-14 - [Voice Interaction Robustness & Accessibility]
+**Learning:** For voice-enabled interfaces using "Push to Talk", simple event handlers like `onmousedown` are insufficient. Users expect keyboard support (Space key), immediate visual feedback before async permissions (perceived performance), and robust state resetting (on mouseleave or window blur). Furthermore, in async flows like `getUserMedia`, re-verifying the intent (e.g., `isRecording` flag) immediately after the promise resolves is critical to prevent "hot mic" race conditions where a user cancels but the microphone starts anyway.
+**Action:** Always implement a centralized `isRecording` state, map both mouse and keyboard events (with input field checks), and re-verify state after every `await` in the recording flow.
+>>>>>>> REPLACE
