@@ -1,0 +1,3 @@
+## 2024-05-15 - [Enhanced Push-to-Talk accessibility and interaction]
+**Learning:** For voice-enabled applications, a simple 'onmousedown'/'onmouseup' pattern is insufficient for a robust "Push to Talk" experience. It requires handling 'mouseleave' to prevent stuck recording states, keyboard mapping (Space bar) for better accessibility, and re-verifying intent after 'getUserMedia' (which is asynchronous and can take time) to avoid "hot mic" race conditions.
+**Action:** Always implement voice recording with a state-based approach that synchronizes visual (button text), accessibility (aria-pressed), and hardware (microphone track cleanup) states across mouse, keyboard, and touch events.
