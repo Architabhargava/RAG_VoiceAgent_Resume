@@ -1,0 +1,3 @@
+## 2025-05-22 - Multi-modal Push-to-Talk UX Pattern
+**Learning:** A robust push-to-talk interface requires synchronizing mouse (`mousedown`/`mouseup`), keyboard (`keydown`/`keyup` for Space), and touch (`touchstart`/`touchend`) events. Special care must be taken to handle asynchronous `getUserMedia` requests by re-verifying the interaction state (e.g., `isRecording` flag) immediately after the promise resolves to prevent "hot mic" race conditions if the user releases the button before permission is granted.
+**Action:** Always use an explicit state flag and check it after every `await` in the recording flow. Implement `mouseleave` to ensure recording stops if the cursor moves off the button.
