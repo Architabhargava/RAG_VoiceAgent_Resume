@@ -1,0 +1,3 @@
+## 2025-05-15 - [Enhanced Voice Interaction Patterns]
+**Learning:** In asynchronous UI flows like microphone permission requests, checking the interaction state immediately after the promise resolves is critical to prevent "hot mic" scenarios where recording starts after a user has already cancelled the action. Adding 'aria-pressed' and dynamic text feedback on the interaction button itself significantly improves the perceived state for all users.
+**Action:** Always re-verify state flags after `await` in UI event handlers and use dynamic 'aria-pressed' attributes for toggled interaction states.
