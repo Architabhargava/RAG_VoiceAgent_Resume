@@ -1,0 +1,3 @@
+## 2025-05-14 - Robust Voice Interaction Patterns
+**Learning:** For 'Push to Talk' interactions, visual feedback (text/color) should be immediate, and state management (like an `isRecording` flag) is crucial to handle race conditions between asynchronous permissions (`getUserMedia`) and user release events. Additionally, mapping the 'Space' key and handling `mouseleave` ensures the recording doesn't get stuck and is accessible.
+**Action:** Always implement a central state flag and wrap recording logic in functions that can be triggered by multiple event types (mouse, keyboard, touch) while ensuring resource cleanup (`MediaStream` tracks and `ObjectURL`s).
