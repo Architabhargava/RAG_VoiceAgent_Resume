@@ -1,0 +1,3 @@
+## 2026-04-04 - [Voice Interaction Accessibility & Robustness]
+**Learning:** In asynchronous UI flows (like requesting microphone permissions via `getUserMedia`), re-verifying the interaction state (e.g., `isRecording` flag) immediately after the `await` is critical to prevent "hot mic" race conditions if the user cancels during the permission prompt. Additionally, mapping the 'Space' key to voice interaction requires global listeners but must check `event.target` to avoid interfering with input fields.
+**Action:** Always implement a state flag to synchronize multiple input methods (mouse, touch, keyboard) and perform a post-await validation of that flag before starting the media stream.
