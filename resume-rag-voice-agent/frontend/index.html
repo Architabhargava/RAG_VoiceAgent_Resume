@@ -7,17 +7,19 @@
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f9; }
         .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px; background-color: #007bff; color: white; margin-top: 1rem; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px; background-color: #007bff; color: white; margin-top: 1rem; transition: all 0.2s ease; }
+        button:active { transform: scale(0.98); }
         button:disabled { background-color: #ccc; }
-        #status { margin-top: 1rem; color: #555; }
+        #recordBtn.recording { background-color: #dc3545; }
+        #status { margin-top: 1rem; color: #555; min-height: 1.5em; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Resume Voice Agent</h1>
         <p>Click and hold to speak, release to send.</p>
-        <button id="recordBtn">Push to Talk</button>
-        <div id="status">Ready</div>
+        <button id="recordBtn" aria-pressed="false" aria-label="Push to Talk">Push to Talk</button>
+        <div id="status" aria-live="polite">Ready</div>
         <audio id="audioPlayer" controls style="display:none;"></audio>
     </div>
 
@@ -28,6 +30,9 @@
         let mediaRecorder;
         let audioChunks = [];
         let socket;
+        let isRecording = false;
+        let currentStream = null;
+        let currentAudioUrl = null;
 
         // Initialize WebSocket
         function initWebSocket() {
@@ -42,40 +47,104 @@
 
             socket.onmessage = (event) => {
                 const blob = new Blob([event.data], { type: 'audio/mp3' });
-                const url = URL.createObjectURL(blob);
-                audioPlayer.src = url;
+                if (currentAudioUrl) {
+                    URL.revokeObjectURL(currentAudioUrl);
+                }
+                currentAudioUrl = URL.createObjectURL(blob);
+                audioPlayer.src = currentAudioUrl;
                 audioPlayer.style.display = 'block';
                 audioPlayer.play();
-                status.innerText = 'Playing response...';
+                status.textContent = 'Playing response...';
             };
         }
 
         initWebSocket();
 
         // Recording logic
-        recordBtn.onmousedown = async () => {
+        async function startRecording() {
+            if (isRecording) return;
+            isRecording = true;
             audioChunks = [];
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
 
-            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                audioBlob.arrayBuffer().then(buffer => {
-                    socket.send(buffer);
-                    status.innerText = 'Sent audio, waiting for response...';
-                });
-            };
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (!isRecording) { // User released button while waiting for permission
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+                currentStream = stream;
+                mediaRecorder = new MediaRecorder(stream);
 
-            mediaRecorder.start();
-            status.innerText = 'Recording...';
-            recordBtn.style.backgroundColor = '#dc3545';
-        };
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    audioBlob.arrayBuffer().then(buffer => {
+                        if (socket && socket.readyState === WebSocket.OPEN) {
+                            socket.send(buffer);
+                            status.textContent = 'Sent audio, waiting for response...';
+                        }
+                    });
+                };
 
-        recordBtn.onmouseup = () => {
-            mediaRecorder.stop();
-            recordBtn.style.backgroundColor = '#007bff';
-        };
+                mediaRecorder.start();
+                status.textContent = 'Recording...';
+                recordBtn.classList.add('recording');
+                recordBtn.setAttribute('aria-pressed', 'true');
+                recordBtn.setAttribute('aria-label', 'Release to Send');
+                recordBtn.textContent = 'Release to Send';
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                status.textContent = 'Microphone access denied';
+                isRecording = false;
+            }
+        }
+
+        function stopRecording() {
+            if (!isRecording) return;
+            isRecording = false;
+
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+
+            status.textContent = 'Processing...';
+            recordBtn.classList.remove('recording');
+            recordBtn.setAttribute('aria-pressed', 'false');
+            recordBtn.setAttribute('aria-label', 'Push to Talk');
+            recordBtn.textContent = 'Push to Talk';
+        }
+
+        recordBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startRecording(); });
+        recordBtn.addEventListener('mouseup', (e) => { e.preventDefault(); stopRecording(); });
+        recordBtn.addEventListener('mouseleave', () => stopRecording());
+
+        // Touch support
+        recordBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+        recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+
+        // Global release safety
+        window.addEventListener('mouseup', () => { if (isRecording) stopRecording(); });
+
+        // Keyboard support
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !e.repeat) {
+                const target = e.target;
+                if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.isContentEditable) {
+                    e.preventDefault();
+                    startRecording();
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                stopRecording();
+            }
+        });
     </script>
 </body>
 </html>
