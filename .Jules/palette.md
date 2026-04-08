@@ -1,0 +1,3 @@
+## 2025-05-14 - Accessible Voice Interaction State
+**Learning:** For interactive buttons with dynamic text content (like 'Push to Talk' vs 'Release to Send'), simply updating 'textContent' is not always enough for screen readers if a static 'aria-label' was initially present. Synchronizing 'aria-label' with 'textContent' ensures that assistive technology correctly announces the current action. Additionally, 'aria-pressed' provides a clear semantic state for push-to-talk interactions.
+**Action:** Always update 'aria-label' alongside 'textContent' for dynamic action buttons and use 'aria-pressed' to reflect toggle/hold states.
