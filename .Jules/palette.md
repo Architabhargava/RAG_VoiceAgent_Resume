@@ -1,0 +1,3 @@
+## 2025-05-23 - Robust Push-to-Talk Implementation
+**Learning:** For "Push to Talk" interactions, using a combination of `mousedown`, `mouseleave`, `mouseup`, and global window listeners for `mouseup` and `keyup` (Space bar) is essential to prevent "stuck" recording states if the user interaction ends outside the button or via keyboard. Handling the `getUserMedia` promise race condition (where the user might release the button before permission is granted) is critical for preventing orphaned microphone streams.
+**Action:** Always implement a state flag (`isRecording`) and re-verify intent immediately after `getUserMedia` resolves. Map both pointer and keyboard events for full accessibility.
