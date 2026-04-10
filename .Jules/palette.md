@@ -1,0 +1,3 @@
+## 2024-04-10 - Preventing 'Hot Mic' Race Conditions in Voice Interfaces
+**Learning:** In 'Push to Talk' interfaces, the asynchronous nature of `getUserMedia` creates a race condition where the user may release the interaction before the microphone stream is initialized. If unhandled, this can leave the recording in a 'stuck' active state because state-guarding logic (like `if (!isRecording) return`) prevents the late-starting recorder from ever being stopped.
+**Action:** Always re-verify the active intent (the `isRecording` state flag) immediately after the `await navigator.mediaDevices.getUserMedia` call. If intent has been lost, stop all tracks of the newly created stream and exit the recording initialization.
