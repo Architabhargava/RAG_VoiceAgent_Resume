@@ -1,0 +1,3 @@
+## 2025-03-24 - Accessible Push-to-Talk (PTT) Pattern
+**Learning:** For voice interaction, a static button label (like "Push to Talk") is insufficient during the active state. Users benefit from immediate textual feedback (e.g., "Release to Send") and assistive technologies need state indicators (aria-pressed). Additionally, robust PTT requires handling edge cases like `mouseleave` and window-level `mouseup` to prevent "hot mic" situations where recording continues after the user thinks they've stopped.
+**Action:** Always implement PTT with dynamic text feedback, `aria-pressed`, `aria-live` for status updates, and inclusive event handling (mouse, touch, keyboard) with thorough interaction cleanup.
