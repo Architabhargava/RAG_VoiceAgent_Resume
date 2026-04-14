@@ -1,0 +1,3 @@
+## 2025-05-23 - Robust Voice Interaction Pattern
+**Learning:** For voice-based "Push to Talk" interfaces, relying solely on `mousedown`/`mouseup` is fragile. A robust pattern requires: 1) An `isRecording` state flag to synchronize multiple input methods. 2) Keyboard support (Space bar) with `event.repeat` and `activeElement` checks to avoid interfering with inputs. 3) Touch event support (`touchstart`/`touchend`) with `preventDefault()` to handle mobile quirks. 4) A global `window` `mouseup` listener to ensure recording stops even if the pointer leaves the button.
+**Action:** Always encapsulate recording logic into `start`/`stop` functions and bind them to mouse, touch, and keyboard events using this unified state management pattern.
