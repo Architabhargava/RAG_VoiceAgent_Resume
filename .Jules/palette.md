@@ -1,0 +1,3 @@
+## 2025-05-15 - Improving Voice Interaction UX
+**Learning:** For "Push to Talk" interfaces, providing immediate visual feedback (transitions, color changes) and textual feedback (changing "Push to Talk" to "Release to Send") on the action button itself significantly improves the user's understanding of the interaction state. Keyboard support via the Space bar is a natural expectation for such interfaces and should include prevention of default scroll behavior and repeat event checks.
+**Action:** Always map Space bar (with `e.preventDefault()` and `!e.repeat`) to primary voice actions and use ARIA attributes like `aria-pressed` and `aria-live` to communicate state changes to assistive technology.
