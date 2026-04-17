@@ -1,0 +1,3 @@
+## 2025-05-15 - Enhancing Push-to-Talk UX and Accessibility
+**Learning:** For voice interfaces, immediate tactile and visual feedback (scale transforms, color transitions) combined with keyboard (Spacebar) and touch support significantly improves the "feel" of the interaction. Crucially, handling the race condition where a user releases the button before microphone permission is granted prevents "hot mic" bugs and improves user trust.
+**Action:** Always implement a robust state flag (`isRecording`) that is checked immediately after async permission requests, and ensure layout stability by providing `min-height` for dynamic status containers.
