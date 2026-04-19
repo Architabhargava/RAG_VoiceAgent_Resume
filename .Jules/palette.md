@@ -1,0 +1,3 @@
+## 2025-05-15 - Enhancing Push-to-Talk Accessibility and Robustness
+**Learning:** For voice-based interfaces, a 'Push to Talk' interaction requires careful synchronization of mouse, keyboard (Space bar), and touch events. Handling 'hot mic' race conditions is critical—always re-verify the recording intent after the asynchronous microphone permission request resolves to avoid unintentional recording if the user releases the button before permission is granted.
+**Action:** Use a centralized `isRecording` state flag and encapsulate start/stop logic into dedicated functions. Implement `aria-pressed` and `aria-live` for screen reader feedback, and always cleanup media tracks explicitly.
