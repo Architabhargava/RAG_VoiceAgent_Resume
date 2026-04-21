@@ -1,0 +1,3 @@
+## 2025-05-15 - [Voice UI Interaction Patterns]
+**Learning:** For 'Push to Talk' interfaces, relying solely on button-level 'mouseup' events is unreliable if the user drags their cursor off the button. Keyboard 'keydown' events also fire repeatedly if held, which can restart recording logic unintentionally.
+**Action:** Use 'window.addEventListener("mouseup", ...)' for robust recording termination. Always check 'event.repeat' in 'keydown' handlers for voice triggers to ensure the recording start logic only fires once. Use 'URL.revokeObjectURL' to manage memory when frequently replacing audio sources from Blobs.
