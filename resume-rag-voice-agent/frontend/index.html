@@ -7,16 +7,20 @@
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f9; }
         .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px; background-color: #007bff; color: white; margin-top: 1rem; }
-        button:disabled { background-color: #ccc; }
-        #status { margin-top: 1rem; color: #555; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px; background-color: #007bff; color: white; margin-top: 1rem; transition: all 0.2s ease; outline: none; }
+        button:active { transform: scale(0.98); }
+        button:focus-visible { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #007bff; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #recordBtn.recording { background-color: #dc3545; transform: scale(1.05); }
+        #recordBtn.recording:active { transform: scale(1.02); }
+        #status { margin-top: 1rem; color: #555; min-height: 1.5em; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Resume Voice Agent</h1>
         <p>Click and hold to speak, release to send.</p>
-        <button id="recordBtn">Push to Talk</button>
+        <button id="recordBtn" aria-pressed="false">Push to Talk</button>
         <div id="status">Ready</div>
         <audio id="audioPlayer" controls style="display:none;"></audio>
     </div>
@@ -28,54 +32,108 @@
         let mediaRecorder;
         let audioChunks = [];
         let socket;
+        let isRecordingIntent = false;
+        let currentAudioUrl = null;
 
         // Initialize WebSocket
         function initWebSocket() {
-            socket = new WebSocket('ws://localhost:8000/voice');
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host || 'localhost:8000';
+            socket = new WebSocket(`${protocol}//${host}/voice`);
             socket.binaryType = 'arraybuffer';
 
-            socket.onopen = () => status.innerText = 'Connected to server';
+            socket.onopen = () => status.textContent = 'Connected to server';
             socket.onclose = () => {
-                status.innerText = 'Disconnected. Retrying...';
+                status.textContent = 'Disconnected. Retrying...';
                 setTimeout(initWebSocket, 2000);
             };
 
             socket.onmessage = (event) => {
+                if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
                 const blob = new Blob([event.data], { type: 'audio/mp3' });
-                const url = URL.createObjectURL(blob);
-                audioPlayer.src = url;
+                currentAudioUrl = URL.createObjectURL(blob);
+                audioPlayer.src = currentAudioUrl;
                 audioPlayer.style.display = 'block';
-                audioPlayer.play();
-                status.innerText = 'Playing response...';
+                audioPlayer.play().catch(e => console.error("Playback failed", e));
+                status.textContent = 'Playing response...';
             };
         }
 
         initWebSocket();
 
-        // Recording logic
-        recordBtn.onmousedown = async () => {
+        async function startRecording() {
+            if (isRecordingIntent) return;
+            isRecordingIntent = true;
             audioChunks = [];
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
 
-            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                audioBlob.arrayBuffer().then(buffer => {
-                    socket.send(buffer);
-                    status.innerText = 'Sent audio, waiting for response...';
-                });
-            };
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (!isRecordingIntent) {
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
 
-            mediaRecorder.start();
-            status.innerText = 'Recording...';
-            recordBtn.style.backgroundColor = '#dc3545';
-        };
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    stream.getTracks().forEach(track => track.stop());
+                    if (audioChunks.length > 0) {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        audioBlob.arrayBuffer().then(buffer => {
+                            if (socket.readyState === WebSocket.OPEN) {
+                                socket.send(buffer);
+                                status.textContent = 'Sent audio, waiting for response...';
+                            }
+                        });
+                    }
+                };
 
-        recordBtn.onmouseup = () => {
-            mediaRecorder.stop();
-            recordBtn.style.backgroundColor = '#007bff';
-        };
+                mediaRecorder.start();
+                status.textContent = 'Recording...';
+                recordBtn.textContent = 'Release to Send';
+                recordBtn.classList.add('recording');
+                recordBtn.setAttribute('aria-pressed', 'true');
+            } catch (err) {
+                console.error("Could not start recording", err);
+                status.textContent = 'Microphone access denied';
+                isRecordingIntent = false;
+            }
+        }
+
+        function stopRecording() {
+            if (!isRecordingIntent) return;
+            isRecordingIntent = false;
+
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                status.textContent = 'Processing audio...';
+            }
+
+            recordBtn.textContent = 'Push to Talk';
+            recordBtn.classList.remove('recording');
+            recordBtn.setAttribute('aria-pressed', 'false');
+        }
+
+        // Event Listeners
+        recordBtn.onmousedown = (e) => { e.preventDefault(); startRecording(); };
+        window.addEventListener('mouseup', stopRecording);
+
+        recordBtn.ontouchstart = (e) => { e.preventDefault(); startRecording(); };
+        recordBtn.ontouchend = (e) => { e.preventDefault(); stopRecording(); };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !e.repeat && e.target === document.body) {
+                e.preventDefault();
+                startRecording();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                stopRecording();
+            }
+        });
     </script>
 </body>
 </html>
