@@ -7,17 +7,22 @@
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f9; }
         .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px; background-color: #007bff; color: white; margin-top: 1rem; }
-        button:disabled { background-color: #ccc; }
-        #status { margin-top: 1rem; color: #555; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px; background-color: #007bff; color: white; margin-top: 1rem; transition: all 0.2s ease; outline: none; }
+        button:hover { background-color: #0056b3; }
+        button:active { transform: scale(0.98); }
+        button:focus-visible { box-shadow: 0 0 0 2px white, 0 0 0 4px #007bff; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #recordBtn.recording { background-color: #dc3545; }
+        #recordBtn.recording:hover { background-color: #a71d2a; }
+        #status { margin-top: 1rem; color: #555; min-height: 1.5em; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Resume Voice Agent</h1>
         <p>Click and hold to speak, release to send.</p>
-        <button id="recordBtn">Push to Talk</button>
-        <div id="status">Ready</div>
+        <button id="recordBtn" aria-pressed="false">Push to Talk</button>
+        <div id="status" aria-live="polite">Ready</div>
         <audio id="audioPlayer" controls style="display:none;"></audio>
     </div>
 
@@ -34,9 +39,9 @@
             socket = new WebSocket('ws://localhost:8000/voice');
             socket.binaryType = 'arraybuffer';
 
-            socket.onopen = () => status.innerText = 'Connected to server';
+            socket.onopen = () => status.textContent = 'Connected to server';
             socket.onclose = () => {
-                status.innerText = 'Disconnected. Retrying...';
+                status.textContent = 'Disconnected. Retrying...';
                 setTimeout(initWebSocket, 2000);
             };
 
@@ -46,35 +51,76 @@
                 audioPlayer.src = url;
                 audioPlayer.style.display = 'block';
                 audioPlayer.play();
-                status.innerText = 'Playing response...';
+                status.textContent = 'Playing response...';
             };
         }
 
         initWebSocket();
 
-        // Recording logic
-        recordBtn.onmousedown = async () => {
+        let isRecording = false;
+
+        async function startRecording() {
+            if (isRecording) return;
+            isRecording = true;
             audioChunks = [];
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
 
-            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                audioBlob.arrayBuffer().then(buffer => {
-                    socket.send(buffer);
-                    status.innerText = 'Sent audio, waiting for response...';
-                });
-            };
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    audioBlob.arrayBuffer().then(buffer => {
+                        socket.send(buffer);
+                        status.textContent = 'Sent audio, waiting for response...';
+                    });
+                };
 
-            mediaRecorder.start();
-            status.innerText = 'Recording...';
-            recordBtn.style.backgroundColor = '#dc3545';
+                mediaRecorder.start();
+                status.textContent = 'Recording...';
+                recordBtn.textContent = 'Release to Send';
+                recordBtn.classList.add('recording');
+                recordBtn.setAttribute('aria-pressed', 'true');
+            } catch (err) {
+                console.error("Error accessing microphone:", err);
+                status.textContent = 'Error accessing microphone';
+                isRecording = false;
+            }
+        }
+
+        function stopRecording() {
+            if (!isRecording) return;
+            isRecording = false;
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            recordBtn.textContent = 'Push to Talk';
+            recordBtn.classList.remove('recording');
+            recordBtn.setAttribute('aria-pressed', 'false');
+            status.textContent = 'Processing audio...';
+        }
+
+        // Recording logic
+        recordBtn.onmousedown = startRecording;
+        recordBtn.onmouseup = stopRecording;
+        recordBtn.onmouseleave = stopRecording; // Handle mouse leaving button while pressed
+
+        // Touch support
+        recordBtn.ontouchstart = (e) => { e.preventDefault(); startRecording(); };
+        recordBtn.ontouchend = (e) => { e.preventDefault(); stopRecording(); };
+
+        // Keyboard support
+        window.onkeydown = (e) => {
+            if (e.code === 'Space' && !isRecording && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                startRecording();
+            }
         };
-
-        recordBtn.onmouseup = () => {
-            mediaRecorder.stop();
-            recordBtn.style.backgroundColor = '#007bff';
+        window.onkeyup = (e) => {
+            if (e.code === 'Space' && isRecording) {
+                e.preventDefault();
+                stopRecording();
+            }
         };
     </script>
 </body>

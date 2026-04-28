@@ -1,0 +1,3 @@
+## 2025-05-14 - Robust Push-to-Talk Interaction
+**Learning:** Combining `aria-pressed` for state feedback, dynamic button text (e.g., "Release to Send"), and global keyboard shortcuts (Space bar) significantly improves the accessibility and intuitiveness of voice-enabled interfaces. Handling edge cases like `onmouseleave` and providing tactile CSS feedback (`transform: scale(0.98)`) makes the interaction feel more professional and reliable.
+**Action:** Always implement coordinated visual, state (ARIA), and multi-modal (mouse/touch/keyboard) updates for recording buttons to ensure a seamless and accessible user experience.
