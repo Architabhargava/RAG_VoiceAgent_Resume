@@ -1,0 +1,3 @@
+## 2025-05-15 - Enhancing Push-to-Talk Interactions
+**Learning:** For "Push to Talk" interfaces, element-specific `onmouseup` events are unreliable if the user moves the cursor away from the button while holding. Using a window-level `mouseup` listener ensures the recording state is always cleaned up. Additionally, checking `event.repeat` and `document.activeElement` when implementing global keyboard shortcuts (like Space bar) prevents accidental triggers during rapid key repeats or text entry.
+**Action:** Always use window-level release listeners for "hold-to-activate" patterns and implement defensive checks for global keyboard shortcuts.
